@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %}Trang chủ học sinh - {{ block.super }}{% endblock %}
+
+{% block content %}
+{% if ongoing_attempt %}
+<div class="alert alert-warning">
+    <h5><i class="fas fa-exclamation-triangle"></i> Bạn có bài thi đang làm dở!</h5>
+    <p>Đề thi: <strong>{{ ongoing_attempt.exam.code }}</strong> - {{ ongoing_attempt.exam.subject }}</p>
+    <a href="{% url 'exam_take' ongoing_attempt.id %}" class="btn btn-warning">
+        <i class="fas fa-play"></i> Tiếp tục làm bài
+    </a>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-8">
+        <h2><i class="fas fa-list-alt"></i> Đề thi khả dụng</h2>
+        
+        {% if available_exams %}
+            <div class="row">
+                {% for exam in available_exams %}
+                <div class="col-md-6 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ exam.code }}</h5>
+                            <p class="card-text">
+                                <strong>Môn:</strong> {{ exam.subject }}<br>
+                                <strong>Số câu:</strong> {{ exam.question_count }}<br>
+                                <strong>Thời gian:</strong> {{ exam.duration_minutes }} phút<br>
+                                {% if exam.scheduled_start %}
+                                    <strong>Bắt đầu:</strong> {{ exam.scheduled_start|date:"d/m/Y H:i" }}<br>
+                                {% endif %}
+                                {% if exam.scheduled_end %}
+                                    <strong>Kết thúc:</strong> {{ exam.scheduled_end|date:"d/m/Y H:i" }}
+                                {% endif %}
+                            </p>
+                            <a href="{% url 'exam_start' exam.id %}" class="btn btn-success">
+                                <i class="fas fa-play"></i> Bắt đầu thi
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> Hiện tại không có đề thi nào khả dụng.
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-history"></i> Lịch sử thi gần đây</h5>
+            </div>
+            <div class="card-body">
+                {% if my_attempts %}
+                    {% for attempt in my_attempts %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                        <div>
+                            <strong>{{ attempt.exam.code }}</strong><br>
+                            <small class="text-muted">
+                                {{ attempt.started_at|date:"d/m/Y H:i" }} - 
+                                {% if attempt.status == 'submitted' %}
+                                    <span class="text-success">{{ attempt.score|floatformat:1 }}%</span>
+                                {% elif attempt.status == 'expired' %}
+                                    <span class="text-warning">Hết giờ</span>
+                                {% else %}
+                                    <span class="text-info">{{ attempt.get_status_display }}</span>
+                                {% endif %}
+                            </small>
+                        </div>
+                        {% if attempt.status in 'submitted,expired' %}
+                            <a href="{% url 'exam_result' attempt.id %}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    
+                    <div class="text-center mt-3">
+                        <a href="{% url 'my_results' %}" class="btn btn-sm btn-outline-secondary">
+                            Xem tất cả
+                        </a>
+                    </div>
+                {% else %}
+                    <p class="text-muted">Chưa có lịch sử thi.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

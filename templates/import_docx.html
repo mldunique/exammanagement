@@ -1,41 +1,94 @@
-{% load static %}
-<!-- http://127.0.0.1:8000/import/ -->
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Import DOCX</title></head>
-<body>
-  <h1>Import câu hỏi từ .docx</h1>
+{% extends 'base.html' %}
 
-  {% if messages %}
-    <ul>
-    {% for m in messages %}<li>{{ m }}</li>{% endfor %}
-    </ul>
-  {% endif %}
+{% block title %}Import câu hỏi - {{ block.super }}{% endblock %}
 
-  <form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    <label>Môn học:</label>
-    <select name="subject_id" required>
-      <option value="" disabled selected>-- Chọn --</option>
-      {% for s in subjects %}
-        <option value="{{ s.id }}">{{ s.code }} - {{ s.name }}</option>
-      {% endfor %}
-    </select>
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-file-import"></i> Import câu hỏi từ file .docx</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="subject" class="form-label">Môn học</label>
+                            <select class="form-select" name="subject_id" id="subject" required>
+                                <option value="" selected disabled>-- Chọn môn học --</option>
+                                {% for s in subjects %}
+                                    <option value="{{ s.id }}">{{ s.code }} - {{ s.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="invalid-feedback">
+                                Vui lòng chọn môn học
+                            </div>
+                        </div>
 
-    <input type="file" name="file" accept=".docx" required>
-    <form method="post" action="{% url 'import_docx' %}" enctype="multipart/form-data">
-        {% csrf_token %}
-        <button type="submit">Import</button>
-    </form>
-  </form>
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Chọn file .docx</label>
+                            <input class="form-control" type="file" id="file" name="file" accept=".docx" required>
+                            <div class="form-text">Chỉ chấp nhận file định dạng .docx</div>
+                            <div class="invalid-feedback">
+                                Vui lòng chọn file .docx
+                            </div>
+                        </div>
 
-  <p style="margin-top:16px;">
-    <strong>Mẫu định dạng .docx được hỗ trợ:</strong><br>
-    Q1. Nội dung câu hỏi…<br>
-    A. Phương án 1<br>
-    B. Phương án 2 * (đúng) <em>hoặc</em> dòng <code>Answer: B</code><br>
-    C. Phương án 3<br>
-    D. Phương án 4
-  </p>
-</body>
-</html>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload me-2"></i> Import
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle"></i> Hướng dẫn</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Mẫu định dạng .docx được hỗ trợ:</strong></p>
+                    <pre class="bg-light p-3 rounded">
+Q1. Nội dung câu hỏi...
+A. Phương án 1
+B. Phương án 2 * (đúng) 
+C. Phương án 3
+D. Phương án 4
+
+Hoặc sử dụng:
+Q2. Câu hỏi khác...
+A. Phương án A
+B. Phương án B
+C. Phương án C
+D. Phương án D
+Answer: B
+                    </pre>
+                    <p class="text-muted">
+                        <small>* Lưu ý: Mỗi câu hỏi cách nhau bằng một dòng trống</small>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Bootstrap 5 form validation
+(function () {
+  'use strict'
+  var forms = document.querySelectorAll('.needs-validation')
+  Array.prototype.slice.call(forms)
+    .forEach(function (form) {
+      form.addEventListener('submit', function (event) {
+        if (!form.checkValidity()) {
+          event.preventDefault()
+          event.stopPropagation()
+        }
+        form.classList.add('was-validated')
+      }, false)
+    })
+})()
+</script>
+{% endblock %}
