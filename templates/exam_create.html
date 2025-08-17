@@ -1,0 +1,27 @@
+{% load static %}
+<!-- http://127.0.0.1:8000/exam/create/ -->
+<h1>Tạo đề thi</h1>
+
+{% if messages %}{% for m in messages %}<p>{{ m }}</p>{% endfor %}{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  <label>Mã đề:</label>
+  <input name="code" required>
+
+  <label>Môn học:</label>
+  <select name="subject_id" required>
+    <option value="" disabled selected>-- Chọn --</option>
+    {% for s in subjects %}
+      <option value="{{ s.id }}">{{ s.code }} - {{ s.name }}</option>
+    {% endfor %}
+  </select>
+
+  <label>Thời lượng (phút):</label>
+  <input type="number" name="duration" min="1" value="60">
+
+  <label>Số câu:</label>
+  <input type="number" name="num_questions" min="1" value="10">
+
+  <button type="submit">Tạo đề</button>
+</form>

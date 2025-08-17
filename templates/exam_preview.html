@@ -1,0 +1,14 @@
+<!-- http://127.0.0.1:8000/exam/1/ -->
+<h2>Đề {{ exam.code }} - {{ exam.subject.name }} ({{ exam.duration_minutes }} phút)</h2>
+<ol>
+  {% for it in items %}
+    <li>
+      <p>{{ it.question.text }}</p>
+      <ul style="list-style-type:none; padding-left:0;">
+        {% for c in it.choices.all %}
+          <li>{{ c.label }}. {{ c.text }}</li>
+        {% endfor %}
+      </ul>
+    </li>
+  {% endfor %}
+</ol>

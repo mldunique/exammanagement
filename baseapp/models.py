@@ -20,3 +20,21 @@ class Choice(models.Model):
     class Meta:
         unique_together = [('question', 'label')]
 
+class Exam(models.Model):
+    code = models.CharField(max_length=20, unique=True)   # mã đề
+    subject = models.ForeignKey('Subject', on_delete=models.CASCADE, related_name='exams')
+    duration_minutes = models.PositiveIntegerField(default=60)
+    question_count = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    def __str__(self): return f"{self.code} - {self.subject}"
+
+class ExamItem(models.Model):
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='items')
+    question = models.ForeignKey('Question', on_delete=models.PROTECT)
+    order = models.PositiveIntegerField()
+
+class ExamChoice(models.Model):
+    item = models.ForeignKey(ExamItem, on_delete=models.CASCADE, related_name='choices')
+    label = models.CharField(max_length=1)  # A, B, C, ...
+    text = models.TextField()
+    is_correct = models.BooleanField(default=False)
