@@ -1,1 +1,8 @@
-<h1>Home Template</h1>
+<h1>Danh sách môn học</h1>
+<ul>
+    {% for subject in subjects %}
+        <li>{{ subject.code }} - {{ subject.name }}</li>
+    {% empty %}
+        <li>Chưa có môn học nào</li>
+    {% endfor %}
+</ul>

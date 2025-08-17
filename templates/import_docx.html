@@ -1,0 +1,40 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Import DOCX</title></head>
+<body>
+  <h1>Import câu hỏi từ .docx</h1>
+
+  {% if messages %}
+    <ul>
+    {% for m in messages %}<li>{{ m }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <label>Môn học:</label>
+    <select name="subject_id" required>
+      <option value="" disabled selected>-- Chọn --</option>
+      {% for s in subjects %}
+        <option value="{{ s.id }}">{{ s.code }} - {{ s.name }}</option>
+      {% endfor %}
+    </select>
+
+    <input type="file" name="file" accept=".docx" required>
+    <form method="post" action="{% url 'import_docx' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <button type="submit">Import</button>
+    </form>
+  </form>
+
+  <p style="margin-top:16px;">
+    <strong>Mẫu định dạng .docx được hỗ trợ:</strong><br>
+    Q1. Nội dung câu hỏi…<br>
+    A. Phương án 1<br>
+    B. Phương án 2 * (đúng) <em>hoặc</em> dòng <code>Answer: B</code><br>
+    C. Phương án 3<br>
+    D. Phương án 4
+  </p>
+</body>
+</html>
