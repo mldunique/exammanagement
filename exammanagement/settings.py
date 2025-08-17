@@ -82,16 +82,17 @@ WSGI_APPLICATION = 'exammanagement.wsgi.application'
 #         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'exammanagement',
-        'USER': 'nghphuongict',
-        'PASSWORD': 'Mkac@12345',
-        'HOST': '127.0.0.1',
+        'USER': 'hieunn',        # user bạn vừa tạo
+        'PASSWORD': '123456',
+        'HOST': '127.0.0.1',     # hoặc 'localhost'
         'PORT': '3306',
-        'OPTIONS': {'charset': 'utf8mb4'},
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+        },
     }
 }
 
