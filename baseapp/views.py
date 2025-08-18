@@ -225,59 +225,63 @@ def _doc_to_stream(byte_content):
     Trả về 'dòng sự kiện' theo thứ tự hiển thị:
       {'type':'text', 'text': '...'}
       {'type':'image', 'filename':'xxx.jpg','blob': b'...'}
-    Dùng cho cả header và body (bảng/đoạn).
+    Dùng cho cả header và body (bảng/đoạn). Text luôn được đẩy TRƯỚC ảnh để đảm bảo đã có cur.
     """
     doc = Document(BytesIO(byte_content))
     stream = []
     for block in _iter_block_items(doc):
         if isinstance(block, Paragraph):
+            # Paragraph: text trước, ảnh sau (đã đúng từ trước)
             txt = _norm(block.text)
+            if txt:
+                stream.append({'type': 'text', 'text': txt})
             imgs = _extract_images_from_paragraph(block)
-            if txt: stream.append({'type':'text','text':txt})
             for fn, blob in imgs:
-                stream.append({'type':'image','filename':fn,'blob':blob})
+                stream.append({'type': 'image', 'filename': fn, 'blob': blob})
         else:
-            # Table: đi theo hàng; ghép 2 cột kiểu [KEY][VALUE]
+            # Table: DUYỆT TỪNG HÀNG — TEXT TRƯỚC, ẢNH SAU
             for row in block.rows:
-                # nhiều tài liệu merge cell -> các cell có text trùng; lấy theo index
                 cells = row.cells
-                # xử lý từng cell -> many paragraphs
-                # Trường hợp "QN=1 | <stem>" ở 2 cột
-                left_txt = _norm("\n".join(_norm(p.text) for p in cells[0].paragraphs)) if len(cells)>=1 else ""
-                right_txt = _norm("\n".join(_norm(p.text) for p in cells[1].paragraphs)) if len(cells)>=2 else ""
 
-                # ảnh trong mỗi cell
-                for p in cells[0].paragraphs:
-                    for fn, blob in _extract_images_from_paragraph(p):
-                        stream.append({'type':'image','filename':fn,'blob':blob})
-                if len(cells)>=2:
-                    for p in cells[1].paragraphs:
-                        for fn, blob in _extract_images_from_paragraph(p):
-                            stream.append({'type':'image','filename':fn,'blob':blob})
+                def cell_text(i):
+                    return _norm("\n".join(_norm(p.text) for p in cells[i].paragraphs)) if len(cells) > i else ""
 
-                # các mẫu đặc thù
+                left_txt  = cell_text(0)
+                right_txt = cell_text(1)
+
+                # ---- TEXT PHASE ----
+                # QN=... ưu tiên đẩy trước
                 if re.match(r'^QN\s*=\s*\d+', left_txt, re.I):
-                    stream.append({'type':'text','text': left_txt})
+                    stream.append({'type': 'text', 'text': left_txt})
                     if right_txt:
-                        stream.append({'type':'text','text': right_txt})
-                    continue
+                        stream.append({'type': 'text', 'text': right_txt})
+                else:
+                    # Lựa chọn a./b./c./d. tách 2 cột
+                    if re.match(r'^[A-Da-d][\.\)]$', left_txt) and right_txt:
+                        stream.append({'type': 'text', 'text': f"{left_txt} {right_txt}"})
+                    elif re.match(r'^[A-Da-d][\.\)]\s+.+', left_txt):
+                        stream.append({'type': 'text', 'text': left_txt})
+                    # Hàng kiểu ANSWER/MARK/UNIT/MIX chia 2 cột
+                    elif re.match(r'^(ANSWER|MARK|UNIT|MIX\s*CHOICES)$', left_txt, re.I) and right_txt:
+                        stream.append({'type': 'text', 'text': f"{left_txt}: {right_txt}"})
+                    else:
+                        # đẩy từng cột nếu có text
+                        if left_txt:
+                            stream.append({'type': 'text', 'text': left_txt})
+                        if right_txt:
+                            stream.append({'type': 'text', 'text': right_txt})
 
-                # Lựa chọn a./b./c./d. chia 2 cột
-                if re.match(r'^[A-Da-d][\.\)]$', left_txt) and right_txt:
-                    stream.append({'type':'text','text': f"{left_txt} {right_txt}"})
-                    continue
-                if re.match(r'^[A-Da-d][\.\)]\s+.+', left_txt):
-                    stream.append({'type':'text','text': left_txt})
-                    continue
+                # ---- IMAGE PHASE (sau khi đã đẩy text) ----
+                # Ảnh trong từng cell: phải đẩy SAU text để đảm bảo cur đã được tạo (đặc biệt ở hàng QN)
+                def push_cell_images(i):
+                    if len(cells) > i:
+                        for p in cells[i].paragraphs:
+                            for fn, blob in _extract_images_from_paragraph(p):
+                                stream.append({'type': 'image', 'filename': fn, 'blob': blob})
 
-                # Hàng kiểu ANSWER/MARK/UNIT/MIX chia 2 cột
-                if re.match(r'^(ANSWER|MARK|UNIT|MIX\s*CHOICES)$', left_txt, re.I) and right_txt:
-                    stream.append({'type':'text','text': f"{left_txt}: {right_txt}"})
-                    continue
+                push_cell_images(0)
+                push_cell_images(1)
 
-                # còn lại: đẩy từng cột nếu có
-                if left_txt:  stream.append({'type':'text','text': left_txt})
-                if right_txt: stream.append({'type':'text','text': right_txt})
     return stream
 
 def _parse_template_docx(byte_content):
