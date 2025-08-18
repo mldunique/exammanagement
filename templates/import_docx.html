@@ -1,41 +1,53 @@
 {% load static %}
-<!-- http://127.0.0.1:8000/import/ -->
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>Import DOCX</title></head>
+<head>
+  <meta charset="utf-8">
+  <title>Import DOCX</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial;margin:24px;line-height:1.4}
+    label{display:block;margin:12px 0 6px}
+    input[type=file],select,button{padding:8px}
+    .help{font-size:13px;color:#666}
+    .msg{padding:8px 10px;margin:6px 0;background:#f6f8fa;border:1px solid #e5e7eb;border-radius:8px}
+  </style>
+</head>
 <body>
   <h1>Import câu hỏi từ .docx</h1>
 
   {% if messages %}
     <ul>
-    {% for m in messages %}<li>{{ m }}</li>{% endfor %}
+      {% for m in messages %}
+        <li class="msg">{{ m }}</li>
+      {% endfor %}
     </ul>
   {% endif %}
 
-  <form method="post" enctype="multipart/form-data">
+  <form method="post" enctype="multipart/form-data" action="{% url 'import_docx' %}">
     {% csrf_token %}
-    <label>Môn học:</label>
-    <select name="subject_id" required>
-      <option value="" disabled selected>-- Chọn --</option>
+
+    <!-- Môn học (tùy chọn): dùng cho định dạng cũ; nếu Template.docx có header Subject thì hệ thống sẽ tự nhận -->
+    <label for="subject_id">Môn học (tùy chọn)</label>
+    <select name="subject_id" id="subject_id">
+      <option value="" selected>-- Bỏ trống nếu dùng Template.docx --</option>
       {% for s in subjects %}
         <option value="{{ s.id }}">{{ s.code }} - {{ s.name }}</option>
       {% endfor %}
     </select>
+    <div class="help">Template.docx có header <em>Subject</em> → không cần chọn ở đây.</div>
 
-    <input type="file" name="file" accept=".docx" required>
-    <form method="post" action="{% url 'import_docx' %}" enctype="multipart/form-data">
-        {% csrf_token %}
-        <button type="submit">Import</button>
-    </form>
+    <label for="file">File Template.docx</label>
+    <input id="file" type="file" name="file" accept=".docx" required>
+
+    <label for="assets_zip">Ảnh kèm (ZIP, tùy chọn)</label>
+    <input id="assets_zip" type="file" name="assets_zip" accept=".zip">
+    <div class="help">ZIP chứa các ảnh tham chiếu trong đề, ví dụ <code>[file:8435.jpg]</code>.</div>
+
+    <div style="margin-top:16px">
+      <button type="submit">Import</button>
+    </div>
   </form>
 
-  <p style="margin-top:16px;">
-    <strong>Mẫu định dạng .docx được hỗ trợ:</strong><br>
-    Q1. Nội dung câu hỏi…<br>
-    A. Phương án 1<br>
-    B. Phương án 2 * (đúng) <em>hoặc</em> dòng <code>Answer: B</code><br>
-    C. Phương án 3<br>
-    D. Phương án 4
-  </p>
+  <hr style="margin:24px 0">
 </body>
 </html>

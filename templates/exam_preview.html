@@ -3,7 +3,13 @@
 <ol>
   {% for it in items %}
     <li>
-      <p>{{ it.question.text }}</p>
+      {% if it.question.image %}
+        <p><img src="{{ it.question.image.url }}" alt="QN {{ forloop.counter }}" style="max-width:520px"></p>
+      {% endif %}
+      <p><strong>{{ it.question.text }}</strong></p>
+      <p style="font-size:13px;color:#666">
+        Mark: {{ it.question.mark }} — Unit: {{ it.question.unit }} — Mix choices: {{ it.mix_choices|yesno:"Yes,No" }}
+      </p>
       <ul style="list-style-type:none; padding-left:0;">
         {% for c in it.choices.all %}
           <li>{{ c.label }}. {{ c.text }}</li>
@@ -12,3 +18,4 @@
     </li>
   {% endfor %}
 </ol>
+
