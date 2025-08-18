@@ -136,5 +136,10 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# Thêm ở cuối file
+MEDIA_URL = '/question_image/'  # URL công khai cho ảnh
+MEDIA_ROOT = r'D:\project\exammanagement\question_image'  # THƯ MỤC LƯU ẢNH
+
+# (tuỳ chọn) tạo thư mục nếu chưa có
+import os
+os.makedirs(MEDIA_ROOT, exist_ok=True)

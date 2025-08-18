@@ -11,7 +11,8 @@ class Question(models.Model):
     text = models.TextField()
     level = models.CharField(max_length=20, blank=True)
     # NEW:
-    image = models.ImageField(upload_to='question_images/', blank=True, null=True)
+    # image = models.ImageField(upload_to='question_images/', blank=True, null=True)
+    image = models.ImageField(upload_to='', blank=True, null=True)
     mark = models.FloatField(default=1.0)
     unit = models.CharField(max_length=120, blank=True)
     def __str__(self): return self.text[:60]

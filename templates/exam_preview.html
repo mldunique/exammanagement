@@ -3,9 +3,11 @@
 <ol>
   {% for it in items %}
     <li>
+      
       {% if it.question.image %}
-        <p><img src="{{ it.question.image.url }}" alt="QN {{ forloop.counter }}" style="max-width:520px"></p>
+        <img src="{{ it.question.image.url }}" alt="Q{{ forloop.counter }}" style="max-width: 640px;">
       {% endif %}
+
       <p><strong>{{ it.question.text }}</strong></p>
       <p style="font-size:13px;color:#666">
         Mark: {{ it.question.mark }} — Unit: {{ it.question.unit }} — Mix choices: {{ it.mix_choices|yesno:"Yes,No" }}
