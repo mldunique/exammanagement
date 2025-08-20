@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+
+{% block title %}Làm bài thi - {{ session.exam.code }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-file-alt"></i> {{ session.exam.code }} - {{ session.exam.subject.name }}</h5>
+                <div class="text-danger">
+                    <i class="fas fa-clock"></i> 
+                    <span id="timer">{{ remaining_time }}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <form id="exam-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="session_id" value="{{ session.id }}">
+                    
+                    {% for item in items %}
+                    <div class="question-block mb-4 p-3 border rounded" data-question="{{ item.id }}">
+                        <h6 class="mb-3">
+                            <span class="badge bg-primary me-2">{{ forloop.counter }}</span>
+                            {{ item.question.text }}
+                            <small class="text-muted">({{ item.question.mark }} điểm)</small>
+                        </h6>
+                        
+                        {% if item.question.image %}
+                        <div class="mb-3">
+                            <img src="{{ item.question.image.url }}" alt="Question Image" class="img-fluid" style="max-width: 400px;">
+                        </div>
+                        {% endif %}
+                        
+                        <div class="choices">
+                            {% for choice in item.choices.all %}
+                            <div class="form-check mb-2">
+                                <input class="form-check-input choice-input" 
+                                       type="radio" 
+                                       name="question_{{ item.id }}" 
+                                       id="choice_{{ choice.id }}" 
+                                       value="{{ choice.id }}"
+                                       data-item-id="{{ item.id }}"
+                                       {% if item.selected_choice_id == choice.id %}checked{% endif %}>
+                                <label class="form-check-label" for="choice_{{ choice.id }}">
+                                    <strong>{{ choice.label }}.</strong> {{ choice.text }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card sticky-top">
+            <div class="card-header">
+                <h6><i class="fas fa-list"></i> Tình trạng câu hỏi</h6>
+            </div>
+            <div class="card-body">
+                <div class="question-nav mb-3">
+                    {% for item in items %}
+                    <button type="button" 
+                            class="btn btn-sm btn-outline-secondary me-1 mb-1 question-nav-btn" 
+                            data-question="{{ item.id }}"
+                            data-number="{{ forloop.counter }}">
+                        {{ forloop.counter }}
+                    </button>
+                    {% endfor %}
+                </div>
+                
+                <div class="legend mb-3">
+                    <small>
+                        <span class="badge bg-success me-1"></span> Đã trả lời<br>
+                        <span class="badge bg-secondary me-1"></span> Chưa trả lời
+                    </small>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-warning" id="submit-exam">
+                        <i class="fas fa-paper-plane"></i> Nộp bài
+                    </button>
+                    <a href="{% url 'student_home' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Quay lại
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Submit Confirmation Modal -->
+<div class="modal fade" id="submitModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Xác nhận nộp bài</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn nộp bài không?</p>
+                <p class="text-warning">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    Sau khi nộp bài, bạn không thể thay đổi câu trả lời.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" id="confirmSubmit">Nộp bài</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Timer countdown
+    let timeLeft = parseInt('{{ remaining_time|default:0 }}');
+    const submitUrl = "{% url 'exam_submit' session.id %}";
+    const saveAnswerUrl = "{% url 'save_answer' %}";
+    
+    function updateTimer() {
+        if (timeLeft <= 0) {
+            window.location.href = submitUrl;
+            return;
+        }
+        
+        const hours = Math.floor(timeLeft / 3600);
+        const minutes = Math.floor((timeLeft % 3600) / 60);
+        const seconds = timeLeft % 60;
+        
+        $('#timer').text(
+            String(hours).padStart(2, '0') + ':' + 
+            String(minutes).padStart(2, '0') + ':' + 
+            String(seconds).padStart(2, '0')
+        );
+        
+        timeLeft--;
+    }
+    
+    updateTimer();
+    setInterval(updateTimer, 1000);
+    
+    // Update question status function
+    function updateQuestionStatus(itemId) {
+        const hasAnswer = $('input[name="question_' + itemId + '"]:checked').length > 0;
+        const navBtn = $('.question-nav-btn[data-question="' + itemId + '"]');
+        
+        if (hasAnswer) {
+            navBtn.removeClass('btn-outline-secondary').addClass('btn-success');
+        } else {
+            navBtn.removeClass('btn-success').addClass('btn-outline-secondary');
+        }
+    }
+    
+    // Auto-save answers
+    $('.choice-input').on('change', function() {
+        const itemId = $(this).data('item-id');
+        const choiceId = $(this).val();
+        const sessionId = $('input[name="session_id"]').val();
+        
+        $.post(saveAnswerUrl, {
+            'session_id': sessionId,
+            'item_id': itemId,
+            'choice_id': choiceId,
+            'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+        }).done(function(response) {
+            if (response.success) {
+                updateQuestionStatus(itemId);
+            }
+        }).fail(function() {
+            alert('Lỗi khi lưu câu trả lời. Vui lòng thử lại.');
+        });
+    });
+    
+    // Question navigation
+    $('.question-nav-btn').on('click', function() {
+        const questionId = $(this).data('question');
+        $('html, body').animate({
+            scrollTop: $('[data-question="' + questionId + '"]').offset().top - 100
+        }, 500);
+    });
+    
+    // Submit exam - Fixed modal trigger
+    $('#submit-exam').on('click', function(e) {
+        e.preventDefault();
+        const modal = new bootstrap.Modal(document.getElementById('submitModal'));
+        modal.show();
+    });
+    
+    // Confirm submit button in modal
+    $('#confirmSubmit').on('click', function() {
+        window.location.href = submitUrl;
+    });
+    
+    // Initialize question status for all items on page load
+    $('.question-block').each(function() {
+        const itemId = $(this).data('question');
+        updateQuestionStatus(itemId);
+    });
+    
+    // Prevent accidental page leave
+    window.addEventListener('beforeunload', function(e) {
+        e.preventDefault();
+        e.returnValue = '';
+    });
+});
+</script>
+{% endblock %}

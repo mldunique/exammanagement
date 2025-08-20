@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+
+{% block title %}Kết quả thi - {{ session.exam.code }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <!-- Result Summary Card -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-trophy"></i> Kết quả thi
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <h6 class="text-muted">Mã đề thi</h6>
+                        <h5 class="text-primary">{{ session.exam.code }}</h5>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-muted">Môn học</h6>
+                        <h5>{{ session.exam.subject.name }}</h5>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-muted">Điểm số</h6>
+                        <h4 class="
+                            {% if percentage >= 80 %}text-success
+                            {% elif percentage >= 60 %}text-warning
+                            {% else %}text-danger{% endif %}
+                        ">
+                            {{ session.score }}/{{ session.total_marks }}
+                        </h4>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-muted">Tỷ lệ đúng</h6>
+                        <h4 class="
+                            {% if percentage >= 80 %}text-success
+                            {% elif percentage >= 60 %}text-warning
+                            {% else %}text-danger{% endif %}
+                        ">
+                            {{ percentage }}%
+                        </h4>
+                    </div>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="mt-3">
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar 
+                            {% if percentage >= 80 %}bg-success
+                            {% elif percentage >= 60 %}bg-warning
+                            {% else %}bg-danger{% endif %}
+                        " role="progressbar" >
+                            {{ percentage }}%
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-3 text-center">
+                    <div class="col-md-4">
+                        <small class="text-muted">Thời gian bắt đầu:</small><br>
+                        <strong>{{ session.start_time|date:"d/m/Y H:i" }}</strong>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted">Thời gian kết thúc:</small><br>
+                        <strong>{{ session.end_time|date:"d/m/Y H:i" }}</strong>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted">Thời gian làm bài:</small><br>
+                        <strong>
+                            {% with duration=session.end_time|timesince:session.start_time %}
+                                {{ duration }}
+                            {% endwith %}
+                        </strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-chart-bar"></i> Thống kê chi tiết</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% with correct_count=results|length total_questions=results|length %}
+                        {% for result in results %}
+                            {% if result.is_correct and forloop.first %}
+                                {% with correct_answers=0 %}{% endwith %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% comment %} Calculate correct answers {% endcomment %}
+                        {% with correct_answers=0 %}
+                            {% for result in results %}
+                                {% if result.is_correct %}
+                                    {% with correct_answers=correct_answers|add:1 %}{% endwith %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endwith %}
+                    {% endwith %}
+                    
+                    <div class="col-md-4 text-center">
+                        <div class="p-3 border rounded bg-light">
+                            <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
+                            <h5 class="text-success mb-1">
+                                {% for result in results %}{% if result.is_correct %}{% if forloop.first %}1{% else %}{% endif %}{% endif %}{% endfor %}
+                                {% comment %} Simplified: show total correct from results {% endcomment %}
+                                {{ results|length|floatformat:0 }}
+                            </h5>
+                            <small class="text-muted">Câu trả lời đúng</small>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 text-center">
+                        <div class="p-3 border rounded bg-light">
+                            <i class="fas fa-times-circle text-danger fa-2x mb-2"></i>
+                            <h5 class="text-danger mb-1">
+                                {% comment %} Show wrong answers count {% endcomment %}
+                                0
+                            </h5>
+                            <small class="text-muted">Câu trả lời sai</small>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 text-center">
+                        <div class="p-3 border rounded bg-light">
+                            <i class="fas fa-question-circle text-warning fa-2x mb-2"></i>
+                            <h5 class="text-warning mb-1">0</h5>
+                            <small class="text-muted">Câu bỏ trống</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Results -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-list-alt"></i> Chi tiết từng câu hỏi</h6>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="showAll()">Tất cả</button>
+                    <button class="btn btn-outline-success" onclick="showCorrect()">Đúng</button>
+                    <button class="btn btn-outline-danger" onclick="showWrong()">Sai</button>
+                </div>
+            </div>
+            <div class="card-body">
+                {% for result in results %}
+                <div class="question-result mb-4 p-3 border rounded {% if result.is_correct %}border-success bg-light-success{% else %}border-danger bg-light-danger{% endif %}" 
+                     data-result="{% if result.is_correct %}correct{% else %}wrong{% endif %}">
+                    
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h6 class="mb-0">
+                            <span class="badge {% if result.is_correct %}bg-success{% else %}bg-danger{% endif %} me-2">
+                                {{ forloop.counter }}
+                            </span>
+                            {{ result.question.text }}
+                        </h6>
+                        <div class="text-end">
+                            <span class="badge {% if result.is_correct %}bg-success{% else %}bg-danger{% endif %}">
+                                {% if result.is_correct %}
+                                    <i class="fas fa-check"></i> {{ result.marks }} điểm
+                                {% else %}
+                                    <i class="fas fa-times"></i> 0 điểm
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    {% if result.question.image %}
+                    <div class="mb-3">
+                        <img src="{{ result.question.image.url }}" alt="Question Image" class="img-fluid" style="max-width: 300px;">
+                    </div>
+                    {% endif %}
+                    
+                    <div class="choices">
+                        {% comment %} Get all choices for this question {% endcomment %}
+                        {% for item in session.exam.items.all %}
+                            {% if item.question == result.question %}
+                                {% for choice in item.choices.all %}
+                                <div class="choice-item p-2 mb-2 rounded
+                                    {% if choice.is_correct %}bg-success bg-opacity-10 border border-success{% endif %}
+                                    {% if choice == result.selected %}border border-primary{% endif %}
+                                ">
+                                    <div class="d-flex align-items-center">
+                                        <span class="choice-label me-3">
+                                            {% if choice == result.selected %}
+                                                {% if choice.is_correct %}
+                                                    <i class="fas fa-check-circle text-success"></i>
+                                                {% else %}
+                                                    <i class="fas fa-times-circle text-danger"></i>
+                                                {% endif %}
+                                            {% elif choice.is_correct %}
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            {% else %}
+                                                <i class="far fa-circle text-muted"></i>
+                                            {% endif %}
+                                        </span>
+                                        <span class="choice-text">
+                                            <strong>{{ choice.label }}.</strong> {{ choice.text }}
+                                            {% if choice == result.selected and not choice.is_correct %}
+                                                <span class="badge bg-danger ms-2">Bạn đã chọn</span>
+                                            {% elif choice == result.selected and choice.is_correct %}
+                                                <span class="badge bg-success ms-2">Bạn đã chọn</span>
+                                            {% elif choice.is_correct and choice != result.selected %}
+                                                <span class="badge bg-success ms-2">Đáp án đúng</span>
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    
+                    {% if not result.is_correct %}
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i>
+                            {% if result.selected %}
+                                Bạn đã chọn: <strong>{{ result.selected.label }}. {{ result.selected.text }}</strong>
+                            {% else %}
+                                Bạn chưa trả lời câu này.
+                            {% endif %}
+                            <br>
+                            Đáp án đúng: <strong class="text-success">{{ result.correct.label }}. {{ result.correct.text }}</strong>
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="card mt-4">
+            <div class="card-body text-center">
+                <a href="{% url 'student_home' %}" class="btn btn-primary me-2">
+                    <i class="fas fa-home"></i> Về trang chủ
+                </a>
+                <button class="btn btn-secondary" onclick="window.print()">
+                    <i class="fas fa-print"></i> In kết quả
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-light-success {
+    background-color: rgba(25, 135, 84, 0.05) !important;
+}
+.bg-light-danger {
+    background-color: rgba(220, 53, 69, 0.05) !important;
+}
+
+.choice-item {
+    transition: all 0.2s ease;
+}
+
+.choice-item:hover {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+@media print {
+    .btn, .card-header .btn-group {
+        display: none !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showAll() {
+    $('.question-result').show();
+    $('.btn-group .btn').removeClass('active');
+    event.target.classList.add('active');
+}
+
+function showCorrect() {
+    $('.question-result').hide();
+    $('.question-result[data-result="correct"]').show();
+    $('.btn-group .btn').removeClass('active');
+    event.target.classList.add('active');
+}
+
+function showWrong() {
+    $('.question-result').hide();
+    $('.question-result[data-result="wrong"]').show();
+    $('.btn-group .btn').removeClass('active');
+    event.target.classList.add('active');
+}
+
+// Calculate statistics on page load
+$(document).ready(function() {
+    const totalQuestions = $('.question-result').length;
+    const correctQuestions = $('.question-result[data-result="correct"]').length;
+    const wrongQuestions = $('.question-result[data-result="wrong"]').length;
+    const skippedQuestions = totalQuestions - correctQuestions - wrongQuestions;
+    
+    // Update statistics display
+    $('.text-success h5').first().text(correctQuestions);
+    $('.text-danger h5').first().text(wrongQuestions);
+    $('.text-warning h5').first().text(skippedQuestions);
+    
+    // Set default active button
+    $('.btn-group .btn').first().addClass('active');
+});
+</script>
+{% endblock %}
