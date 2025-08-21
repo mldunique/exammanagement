@@ -26,28 +26,33 @@
                     </div>
                     
                     {% if session_count > 0 %}
-                        <div class="alert alert-warning">
+                        <div class="alert alert-danger">
                             <i class="fas fa-exclamation-triangle"></i>
-                            <strong>Cảnh báo:</strong> Đã có {{ session_count }} học sinh làm bài thi này. 
-                            Việc xóa đề thi sẽ xóa luôn tất cả bài làm của học sinh.
+                            <strong>Cảnh báo quan trọng:</strong> Đã có {{ session_count }} học sinh làm bài thi này. 
+                            Việc xóa đề thi sẽ xóa vĩnh viễn tất cả:
+                            <ul class="mb-0 mt-2">
+                                <li>Bài làm và điểm số của {{ session_count }} học sinh</li>
+                                <li>Tất cả câu hỏi và đáp án của đề thi</li>
+                                <li>Lịch sử thi và dữ liệu thống kê</li>
+                            </ul>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            Chưa có học sinh nào làm bài thi này. An toàn để xóa.
                         </div>
                     {% endif %}
-                    <p class="text-muted">
-                        <i class="fas fa-info-circle"></i> 
-                        Việc xóa đề thi sẽ xóa tất cả câu hỏi và dữ liệu liên quan. Hành động này không thể hoàn tác.
-                    </p>
                 </div>
                 <div class="card-footer">
-                    {% if session_count == 0 %}
-                        <form method="post" class="d-inline">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-danger">
-                                <i class="fas fa-trash"></i> Xác nhận xóa
-                            </button>
-                        </form>
-                    {% endif %}
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger" 
+                                onclick="return confirm('Bạn có chắc chắn muốn xóa vĩnh viễn đề thi này và tất cả dữ liệu liên quan?')">
+                            <i class="fas fa-trash"></i> Xác nhận xóa vĩnh viễn
+                        </button>
+                    </form>
                     <a href="{% url 'admin_home' %}" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> {% if session_count > 0 %}Quay lại{% else %}Hủy bỏ{% endif %}
+                        <i class="fas fa-times"></i> Hủy bỏ
                     </a>
                 </div>
             </div>

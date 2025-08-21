@@ -305,17 +305,22 @@ def exam_delete(request, exam_id):
     if request.method == 'POST':
         exam_code = exam.code
         try:
-            # Xóa đề thi (cascade sẽ xóa ExamItem, ExamChoice và StudentExamSession)
+            # Đếm số lượng dữ liệu liên quan trước khi xóa
             session_count = StudentExamSession.objects.filter(exam=exam).count()
+            answer_count = StudentAnswer.objects.filter(session__exam=exam).count()
+            item_count = ExamItem.objects.filter(exam=exam).count()
+            
+            # Xóa đề thi - Django sẽ tự động xóa các bảng liên quan nhờ CASCADE
             exam.delete()
             
+            # Thông báo kết quả chi tiết
             if session_count > 0:
-                messages.success(request, f"Đã xóa đề thi '{exam_code}' và {session_count} bài làm của học sinh.")
+                messages.success(request, f"Đã xóa đề thi '{exam_code}' cùng với {session_count} phiên thi, {answer_count} câu trả lời và {item_count} câu hỏi.")
             else:
-                messages.success(request, f"Đã xóa đề thi '{exam_code}' thành công.")
+                messages.success(request, f"Đã xóa đề thi '{exam_code}' cùng với {item_count} câu hỏi.")
             
         except Exception as e:
-            messages.error(request, f"Lỗi khi xóa đề thi: {str(e)}")
+            messages.error(request, f"Lỗi khi xóa đề thi '{exam_code}': {str(e)}")
         
         return redirect('admin_home')
     
