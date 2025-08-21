@@ -57,12 +57,24 @@ def admin_home(request):
     if not hasattr(request.user, 'userprofile') or request.user.userprofile.role != 'admin':
         return redirect('student_home')
     
+    # Lấy thống kê
     subjects = Subject.objects.all()
-    print(subjects)
-    recent_exams = Exam.objects.order_by('-created_at')[:5]
+    all_exams = Exam.objects.select_related('subject').order_by('-created_at')
+    recent_exams = all_exams[:5]
+    
+    # Tính toán thống kê
+    stats = {
+        'total_subjects': subjects.count(),
+        'total_questions': Question.objects.count(),
+        'total_exams': all_exams.count(),
+        'active_attempts': StudentExamSession.objects.filter(is_submitted=False).count()
+    }
+    
     return render(request, 'admin_home.html', {
         'subjects': subjects, 
-        'recent_exams': recent_exams
+        'exams': recent_exams,
+        'all_exams': all_exams,
+        'stats': stats
     })
 
 @login_required
@@ -280,6 +292,39 @@ def exam_schedule(request, exam_id):
         return redirect('exam_preview', exam_id=exam.id)
     
     return render(request, 'exam_schedule.html', {'exam': exam})
+
+@login_required
+def exam_delete(request, exam_id):
+    """Xóa đề thi"""
+    if not hasattr(request.user, 'userprofile') or request.user.userprofile.role != 'admin':
+        messages.error(request, 'Bạn không có quyền thực hiện thao tác này.')
+        return redirect('student_home')
+    
+    exam = get_object_or_404(Exam, id=exam_id)
+    
+    if request.method == 'POST':
+        exam_code = exam.code
+        try:
+            # Xóa đề thi (cascade sẽ xóa ExamItem, ExamChoice và StudentExamSession)
+            session_count = StudentExamSession.objects.filter(exam=exam).count()
+            exam.delete()
+            
+            if session_count > 0:
+                messages.success(request, f"Đã xóa đề thi '{exam_code}' và {session_count} bài làm của học sinh.")
+            else:
+                messages.success(request, f"Đã xóa đề thi '{exam_code}' thành công.")
+            
+        except Exception as e:
+            messages.error(request, f"Lỗi khi xóa đề thi: {str(e)}")
+        
+        return redirect('admin_home')
+    
+    # GET request - hiển thị trang xác nhận
+    session_count = StudentExamSession.objects.filter(exam=exam).count()
+    return render(request, 'exam_delete_confirm.html', {
+        'exam': exam,
+        'session_count': session_count
+    })
 
 # ===== STUDENT VIEWS =====
 @login_required

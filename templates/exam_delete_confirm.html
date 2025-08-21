@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block title %}Xác nhận xóa đề thi - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Xác nhận xóa đề thi</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-warning"></i> <strong>Cảnh báo:</strong> Hành động này không thể hoàn tác!
+                    </div>
+                    
+                    <h6>Bạn có chắc chắn muốn xóa đề thi sau?</h6>
+                    
+                    <div class="bg-light p-3 rounded mb-3">
+                        <strong>Mã đề:</strong> {{ exam.code }}<br>
+                        <strong>Môn học:</strong> {{ exam.subject.name }}<br>
+                        <strong>Số câu hỏi:</strong> {{ exam.question_count }}<br>
+                        <strong>Thời gian:</strong> {{ exam.duration_minutes }} phút<br>
+                        <strong>Ngày tạo:</strong> {{ exam.created_at|date:"d/m/Y H:i" }}
+                    </div>
+                    
+                    {% if session_count > 0 %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Cảnh báo:</strong> Đã có {{ session_count }} học sinh làm bài thi này. 
+                            Việc xóa đề thi sẽ xóa luôn tất cả bài làm của học sinh.
+                        </div>
+                    {% endif %}
+                    <p class="text-muted">
+                        <i class="fas fa-info-circle"></i> 
+                        Việc xóa đề thi sẽ xóa tất cả câu hỏi và dữ liệu liên quan. Hành động này không thể hoàn tác.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    {% if session_count == 0 %}
+                        <form method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Xác nhận xóa
+                            </button>
+                        </form>
+                    {% endif %}
+                    <a href="{% url 'admin_home' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> {% if session_count > 0 %}Quay lại{% else %}Hủy bỏ{% endif %}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

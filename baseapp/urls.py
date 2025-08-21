@@ -23,6 +23,7 @@ urlpatterns = [
     path('admin/exam/create/', views.exam_create, name='exam_create'),
     path('admin/exam/<int:exam_id>/', views.exam_preview, name='exam_preview'),
     path('admin/exam/<int:exam_id>/schedule/', views.exam_schedule, name='exam_schedule'),
+    path('admin/exam/<int:exam_id>/delete/', views.exam_delete, name='exam_delete'),
     
     # Student URLs
     path('student/home/', views.student_home, name="student_home"),
