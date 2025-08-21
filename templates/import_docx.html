@@ -1,49 +1,108 @@
-{% load static %}
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Import DOCX</title>
-  <style>
-    body{font-family:system-ui,Segoe UI,Arial;margin:24px;line-height:1.4}
-    label{display:block;margin:12px 0 6px}
-    input[type=file],select,button{padding:8px}
-    .help{font-size:13px;color:#666}
-    .msg{padding:8px 10px;margin:6px 0;background:#f6f8fa;border:1px solid #e5e7eb;border-radius:8px}
-  </style>
-</head>
-<body>
-  <h1>Import câu hỏi từ .docx</h1>
+{% extends 'base.html' %}
 
-  {% if messages %}
-    <ul>
-      {% for m in messages %}
-        <li class="msg">{{ m }}</li>
-      {% endfor %}
-    </ul>
-  {% endif %}
+{% block title %}Import câu hỏi từ DOCX - Hệ thống thi trắc nghiệm{% endblock %}
 
-  <form method="post" enctype="multipart/form-data" action="{% url 'import_docx' %}">
-    {% csrf_token %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-file-import me-2"></i>
+                    Import câu hỏi từ .docx
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" action="{% url 'import_docx' %}">
+                    {% csrf_token %}
 
-    <!-- Môn học (tùy chọn): dùng cho định dạng cũ; nếu Template.docx có header Subject thì hệ thống sẽ tự nhận -->
-    <label for="subject_id">Môn học (tùy chọn)</label>
-    <select name="subject_id" id="subject_id">
-      <option value="" selected>-- Bỏ trống nếu dùng Template.docx --</option>
-      {% for s in subjects %}
-        <option value="{{ s.id }}">{{ s.code }} - {{ s.name }}</option>
-      {% endfor %}
-    </select>
-    <div class="help">Template.docx có header <em>Subject</em> → không cần chọn ở đây.</div>
+                    <!-- Môn học (tùy chọn) -->
+                    <div class="mb-3">
+                        <label for="subject_id" class="form-label">
+                            <i class="fas fa-book me-1"></i>
+                            Môn học (tùy chọn)
+                        </label>
+                        <select name="subject_id" id="subject_id" class="form-select">
+                            <option value="" selected>-- Bỏ trống nếu dùng Template.docx --</option>
+                            {% for s in subjects %}
+                                <option value="{{ s.id }}">{{ s.code }} - {{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Template.docx có header <em>Subject</em> → không cần chọn ở đây.
+                        </div>
+                    </div>
 
-    <label for="file">File Template.docx</label>
-    <input id="file" type="file" name="file" accept=".docx" required>
+                    <!-- Thời gian làm bài -->
+                    <div class="mb-3">
+                        <label for="duration_minutes" class="form-label">
+                            <i class="fas fa-clock me-1"></i>
+                            Thời gian làm bài (phút)
+                        </label>
+                        <input type="number" 
+                               name="duration_minutes" 
+                               id="duration_minutes" 
+                               class="form-control" 
+                               min="1" 
+                               max="300" 
+                               value="60" 
+                               required>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Nhập số phút cho bài thi (từ 1 đến 300 phút)
+                        </div>
+                    </div>
 
-    <div style="margin-top:16px">
-      <button type="submit">Import</button>
+                    <!-- File upload -->
+                    <div class="mb-4">
+                        <label for="file" class="form-label">
+                            <i class="fas fa-file-word me-1"></i>
+                            File Template.docx
+                        </label>
+                        <input id="file" type="file" name="file" accept=".docx" required class="form-control">
+                        <div class="form-text">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            Chỉ chấp nhận file .docx
+                        </div>
+                    </div>
+
+                    <!-- Submit button -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-upload me-2"></i>
+                            Import câu hỏi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Instructions card -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-question-circle me-2"></i>
+                    Hướng dẫn sử dụng
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Sử dụng file Template.docx với định dạng chuẩn
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        File có thể chứa header Subject để tự động nhận diện môn học
+                    </li>
+                    <li class="mb-0">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Hệ thống sẽ tự động phân tích và import câu hỏi
+                    </li>
+                </ul>
+            </div>
+        </div>
     </div>
-  </form>
-
-  <hr style="margin:24px 0">
-</body>
-</html>
+</div>
+{% endblock %}

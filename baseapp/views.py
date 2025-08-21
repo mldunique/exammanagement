@@ -1,34 +1,92 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth import authenticate, login as auth_login, logout
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.db import transaction
+from django.utils import timezone
+from django.http import JsonResponse
 from io import BytesIO
 from docx import Document
 from random import sample, shuffle
 import re, zipfile, os
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from .models import Subject, Question, Choice, Exam, ExamItem, ExamChoice
+from .models import (Subject, Question, Choice, Exam, ExamItem, ExamChoice, 
+                    StudentExamSession, StudentAnswer, UserProfile)
 from docx.oxml.text.paragraph import CT_P
 from docx.oxml.table import CT_Tbl
 from docx.text.paragraph import Paragraph
 from docx.table import Table
 from docx.oxml.ns import qn
 
-def home(request):
-    subjects = Subject.objects.all()
-    return render(request, 'home.html', {'subjects': subjects})
-
-def login(request):
+def login_view(request):
+    """Trang đăng nhập chung"""
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            auth_login(request, user)
+            # Phân quyền theo role
+            try:
+                profile = user.userprofile
+                if profile.role == 'admin':
+                    return redirect('admin_home')
+                else:
+                    return redirect('student_home')
+            except UserProfile.DoesNotExist:
+                # Tạo profile mặc định nếu chưa có
+                UserProfile.objects.create(user=user, role='student')
+                return redirect('student_home')
+        else:
+            messages.error(request, 'Tên đăng nhập hoặc mật khẩu không đúng')
+    
     return render(request, 'login.html')
 
+def logout_view(request):
+    logout(request)
+    return redirect('login')
+
+# ===== ADMIN VIEWS =====
+# @login_required
+def admin_home(request):
+    """Trang chủ admin"""
+    # Kiểm tra quyền admin
+    if not hasattr(request.user, 'userprofile') or request.user.userprofile.role != 'admin':
+        return redirect('student_home')
+    
+    subjects = Subject.objects.all()
+    print(subjects)
+    recent_exams = Exam.objects.order_by('-created_at')[:5]
+    return render(request, 'admin_home.html', {
+        'subjects': subjects, 
+        'recent_exams': recent_exams
+    })
+
+@login_required
 @require_http_methods(["GET", "POST"])
 def import_docx(request):
+    """Import đề thi từ file docx (giữ nguyên code cũ)"""
+    if not hasattr(request.user, 'userprofile') or request.user.userprofile.role != 'admin':
+        return redirect('student_home')
+    
     subjects = Subject.objects.all()
     if request.method == "POST":
         file = request.FILES.get("file")
         if not file:
             messages.error(request, "Hãy chọn file .docx (Template).")
+            return redirect("import_docx")
+
+        # Lấy thời gian làm bài từ form
+        try:
+            duration_minutes = int(request.POST.get("duration_minutes", 60))
+            if duration_minutes < 1 or duration_minutes > 300:
+                messages.error(request, "Thời gian làm bài phải từ 1 đến 300 phút.")
+                return redirect("import_docx")
+        except (ValueError, TypeError):
+            messages.error(request, "Thời gian làm bài không hợp lệ.")
             return redirect("import_docx")
 
         raw = file.read()
@@ -37,7 +95,7 @@ def import_docx(request):
         try:
             meta, items = _parse_template_docx(raw)
         except Exception as e:
-            messages.error(request, f"Lỗi đọc Template.docx: {e}")
+            messages.error(request, "Chỉ chấp nhận file định dạng docx")
             return redirect("import_docx")
 
         # 2) Map Subject từ header
@@ -48,18 +106,20 @@ def import_docx(request):
             messages.error(request, f"Subject '{subj_raw}' không tồn tại. Tạo trước trong admin.")
             return redirect("import_docx")
 
-        # 3) Kiểm tra mã đề
-        exam_code = (meta['topic_code'] or '').strip()
-        if not exam_code:
+        # 3) Kiểm tra mã đề và thêm tiền tố subject
+        exam_code_raw = (meta['topic_code'] or '').strip()
+        if not exam_code_raw:
             messages.error(request, "Thiếu Topic code (Mã đề).")
             return redirect("import_docx")
+        
+        # Thêm tiền tố subject vào mã đề
+        exam_code = f"{subject.code}_{exam_code_raw}"
         if Exam.objects.filter(code=exam_code).exists():
             messages.error(request, f"Mã đề '{exam_code}' đã tồn tại.")
             return redirect("import_docx")
 
         # Helper: lưu file đúng tên (overwrite nếu trùng tên)
         def save_binary_exact(filename: str, data: bytes) -> str:
-            # filename chỉ là tên file (không path); default_storage đang trỏ MEDIA_ROOT
             if default_storage.exists(filename):
                 default_storage.delete(filename)
             return default_storage.save(filename, ContentFile(data))
@@ -110,7 +170,7 @@ def import_docx(request):
             exam = Exam.objects.create(
                 code=exam_code,
                 subject=subject,
-                duration_minutes=60,
+                duration_minutes=duration_minutes,
                 question_count=len(created_qs),
             )
             for idx, (qobj, mix) in enumerate(created_qs, start=1):
@@ -119,7 +179,6 @@ def import_docx(request):
                 )
                 opts = list(qobj.choices.order_by('label'))
                 if mix:
-                    from random import shuffle
                     shuffle(opts)
                 labels = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
                 for i, opt in enumerate(opts):
@@ -128,17 +187,19 @@ def import_docx(request):
                     )
 
         msg = f"Đã import {len(created_qs)} câu hỏi cho {subject}. Tạo đề '{exam.code}'."
-        if '_num_quiz_mismatch' in meta:
-            exp, found = meta['_num_quiz_mismatch']
-            warns.append(f"Số câu trong header: {exp}; thực tế: {found}.")
         messages.success(request, msg)
-        if warns:
-            messages.warning(request, "Cảnh báo:\n" + "\n".join(warns))
+        if warns or '_num_quiz_mismatch' in meta:
+            messages.warning(request, "Lưu ý: File có thể không đúng định dạng chuẩn. Vui lòng kiểm tra lại template DOCX.")
         return redirect('exam_preview', exam_id=exam.id)
 
     return render(request, "import_docx.html", {"subjects": subjects})
 
+@login_required
 def exam_create(request):
+    """Tạo đề thi ngẫu nhiên"""
+    if not hasattr(request.user, 'userprofile') or request.user.userprofile.role != 'admin':
+        return redirect('student_home')
+    
     subjects = Subject.objects.all()
     if request.method == 'POST':
         code = (request.POST.get('code') or '').strip()
@@ -151,8 +212,11 @@ def exam_create(request):
             return redirect('exam_create')
 
         subject = get_object_or_404(Subject, id=subject_id)
-        if Exam.objects.filter(code=code).exists():
-            messages.error(request, "Mã đề đã tồn tại.")
+        
+        # Thêm tiền tố subject vào mã đề
+        exam_code = f"{subject.code}_{code}"
+        if Exam.objects.filter(code=exam_code).exists():
+            messages.error(request, f"Mã đề '{exam_code}' đã tồn tại.")
             return redirect('exam_create')
 
         all_qs = list(Question.objects.filter(subject=subject).prefetch_related('choices'))
@@ -163,7 +227,7 @@ def exam_create(request):
         picked = sample(all_qs, n)   # chọn ngẫu nhiên n câu
         with transaction.atomic():
             exam = Exam.objects.create(
-                code=code, subject=subject,
+                code=exam_code, subject=subject,
                 duration_minutes=duration, question_count=n
             )
             for idx, q in enumerate(picked, start=1):
@@ -182,11 +246,227 @@ def exam_create(request):
 
     return render(request, 'exam_create.html', {'subjects': subjects})
 
+@login_required
 def exam_preview(request, exam_id):
+    """Xem trước đề thi (admin)"""
+    if not hasattr(request.user, 'userprofile') or request.user.userprofile.role != 'admin':
+        return redirect('student_home')
+    
     exam = get_object_or_404(Exam.objects.select_related('subject'), id=exam_id)
     items = exam.items.select_related('question').prefetch_related('choices').order_by('order')
     return render(request, 'exam_preview.html', {'exam': exam, 'items': items})
 
+@login_required
+def exam_schedule(request, exam_id):
+    """Thiết lập lịch thi (ý 4)"""
+    if not hasattr(request.user, 'userprofile') or request.user.userprofile.role != 'admin':
+        return redirect('student_home')
+    
+    exam = get_object_or_404(Exam, id=exam_id)
+    
+    if request.method == 'POST':
+        start_time = request.POST.get('start_time')
+        end_time = request.POST.get('end_time')
+        is_active = request.POST.get('is_active') == 'on'
+        
+        if start_time:
+            exam.start_time = timezone.datetime.fromisoformat(start_time)
+        if end_time:
+            exam.end_time = timezone.datetime.fromisoformat(end_time)
+        exam.is_active = is_active
+        exam.save()
+        
+        messages.success(request, f"Đã cập nhật lịch thi cho đề {exam.code}")
+        return redirect('exam_preview', exam_id=exam.id)
+    
+    return render(request, 'exam_schedule.html', {'exam': exam})
+
+# ===== STUDENT VIEWS =====
+@login_required
+def student_home(request):
+    """Trang chủ học sinh - danh sách đề thi có thể làm"""
+    # Lấy các đề thi có thể làm (đang active và trong thời gian cho phép)
+    available_exams = []
+    taken_sessions = StudentExamSession.objects.filter(student=request.user).values_list('exam_id', flat=True)
+    
+    for exam in Exam.objects.filter(is_active=True).order_by('-created_at'):
+        if exam.id not in taken_sessions and exam.is_available_now():
+            available_exams.append(exam)
+    
+    # Session đang thi (chưa nộp bài và chưa hết giờ)
+    ongoing_sessions = StudentExamSession.objects.filter(
+        student=request.user,
+        is_submitted=False
+    ).select_related('exam', 'exam__subject').order_by('-start_time')
+    
+    # Lọc session còn thời gian
+    active_sessions = []
+    for session in ongoing_sessions:
+        if not session.is_time_up():
+            active_sessions.append(session)
+    
+    # Lịch sử thi
+    completed_sessions = StudentExamSession.objects.filter(
+        student=request.user, 
+        is_submitted=True
+    ).select_related('exam', 'exam__subject').order_by('-end_time')
+    
+    return render(request, 'student_home.html', {
+        'available_exams': available_exams,
+        'active_sessions': active_sessions,
+        'completed_sessions': completed_sessions
+    })
+
+@login_required
+def exam_start(request, exam_id):
+    """Bắt đầu làm bài thi"""
+    exam = get_object_or_404(Exam, id=exam_id)
+    
+    # Kiểm tra đề có thể làm không
+    if not exam.is_available_now():
+        messages.error(request, "Đề thi không khả dụng hoặc đã hết hạn")
+        return redirect('student_home')
+    
+    # Kiểm tra đã làm chưa
+    if StudentExamSession.objects.filter(student=request.user, exam=exam).exists():
+        messages.error(request, "Bạn đã làm đề thi này rồi")
+        return redirect('student_home')
+    
+    # Tạo session mới
+    session = StudentExamSession.objects.create(
+        student=request.user,
+        exam=exam
+    )
+    
+    return redirect('exam_taking', session_id=session.id)
+
+@login_required
+def exam_taking(request, session_id):
+    """Trang làm bài thi"""
+    session = get_object_or_404(StudentExamSession, id=session_id, student=request.user)
+    
+    # Kiểm tra đã nộp bài chưa
+    if session.is_submitted:
+        return redirect('exam_result', session_id=session.id)
+    
+    # Kiểm tra hết giờ chưa - tự động nộp bài
+    if session.is_time_up():
+        return redirect('exam_submit', session_id=session.id)
+    
+    # Lấy câu hỏi và câu trả lời hiện tại
+    items = session.exam.items.select_related('question').prefetch_related('choices').order_by('order')
+    existing_answers = {
+        ans.exam_item_id: ans.selected_choice_id 
+        for ans in session.answers.select_related('selected_choice')
+    }
+    
+    # Thêm thông tin selected_choice_id vào từng item để template dễ sử dụng
+    for item in items:
+        item.selected_choice_id = existing_answers.get(item.id)
+    
+    return render(request, 'exam_taking.html', {
+        'session': session,
+        'items': items,
+        'existing_answers': existing_answers,
+        'remaining_time': session.get_remaining_time()
+    })
+
+@login_required
+def save_answer(request):
+    """Lưu câu trả lời (AJAX)"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    session_id = request.POST.get('session_id')
+    item_id = request.POST.get('item_id')
+    choice_id = request.POST.get('choice_id')
+    
+    try:
+        session = StudentExamSession.objects.get(id=session_id, student=request.user)
+        if session.is_submitted or session.is_time_up():
+            return JsonResponse({'error': 'Exam is finished'}, status=400)
+        
+        item = ExamItem.objects.get(id=item_id, exam=session.exam)
+        choice = ExamChoice.objects.get(id=choice_id, item=item) if choice_id else None
+        
+        # Lưu/cập nhật câu trả lời
+        answer, created = StudentAnswer.objects.get_or_create(
+            session=session,
+            exam_item=item,
+            defaults={'selected_choice': choice}
+        )
+        if not created:
+            answer.selected_choice = choice
+            answer.save()
+        
+        return JsonResponse({'success': True})
+        
+    except (StudentExamSession.DoesNotExist, ExamItem.DoesNotExist, ExamChoice.DoesNotExist):
+        return JsonResponse({'error': 'Invalid data'}, status=400)
+
+@login_required
+def exam_submit(request, session_id):
+    """Nộp bài thi"""
+    session = get_object_or_404(StudentExamSession, id=session_id, student=request.user)
+    
+    if session.is_submitted:
+        return redirect('exam_result', session_id=session.id)
+    
+    # Tính điểm
+    total_marks = 0
+    earned_marks = 0
+    
+    for item in session.exam.items.select_related('question'):
+        total_marks += item.question.mark
+        
+        try:
+            answer = session.answers.get(exam_item=item)
+            if answer.selected_choice and answer.selected_choice.is_correct:
+                earned_marks += item.question.mark
+        except StudentAnswer.DoesNotExist:
+            pass  # Câu chưa trả lời = 0 điểm
+    
+    # Lưu kết quả
+    session.end_time = timezone.now()
+    session.is_submitted = True
+    session.score = earned_marks
+    session.total_marks = total_marks
+    session.save()
+    
+    return redirect('exam_result', session_id=session.id)
+
+@login_required
+def exam_result(request, session_id):
+    """Xem kết quả thi"""
+    session = get_object_or_404(StudentExamSession, id=session_id, student=request.user)
+    
+    if not session.is_submitted:
+        return redirect('exam_taking', session_id=session.id)
+    
+    # Lấy chi tiết câu trả lời
+    answers = session.answers.select_related(
+        'exam_item__question', 'selected_choice'
+    ).order_by('exam_item__order')
+    
+    results = []
+    for answer in answers:
+        item = answer.exam_item
+        correct_choice = item.choices.filter(is_correct=True).first()
+        results.append({
+            'question': item.question,
+            'selected': answer.selected_choice,
+            'correct': correct_choice,
+            'is_correct': answer.selected_choice and answer.selected_choice.is_correct,
+            'marks': item.question.mark if (answer.selected_choice and answer.selected_choice.is_correct) else 0
+        })
+    
+    return render(request, 'exam_result.html', {
+        'session': session,
+        'results': results,
+        'percentage': round((session.score / session.total_marks) * 100, 1) if session.total_marks > 0 else 0
+    })
+
+# ===== HELPER FUNCTIONS (giữ nguyên) =====
 def _norm(s: str) -> str:
     if s is None: return ""
     s = s.replace("\xa0", " ")
@@ -301,11 +581,11 @@ def _parse_template_docx(byte_content):
     # ---- header ---- (chỉ đọc TEXT đến khi gặp QN=)
     meta = {'subject': None, 'num_quiz': None, 'lecturer': None, 'date': None, 'topic_code': None}
     header_patterns = {
-        'subject':    r'^(Subject|Môn\s*học)\s*:\s*(.+)$',
-        'num_quiz':   r'^(Number\s*of\s*Quiz|Số\s*câu\s*hỏi)\s*:\s*(\d+)$',
-        'lecturer':   r'^(Lecturer|Giảng\s*viên)\s*:\s*(.+)$',
-        'date':       r'^(Date|Ngày\s*phát\s*hành)\s*:\s*(.+)$',
-        'topic_code': r'^(Topic\s*code|Mã\s*đề)\s*:\s*(.+)$',
+        'subject':    r'^(Subject|Môn\s*học)\s*:\s*(.+)',
+        'num_quiz':   r'^(Number\s*of\s*Quiz|Số\s*câu\s*hỏi)\s*:\s*(\d+)',
+        'lecturer':   r'^(Lecturer|Giảng\s*viên)\s*:\s*(.+)',
+        'date':       r'^(Date|Ngày\s*phát\s*hành)\s*:\s*(.+)',
+        'topic_code': r'^(Topic\s*code|Mã\s*đề)\s*:\s*(.+)',
     }
     i = 0
     while i < len(stream):
@@ -374,7 +654,7 @@ def _parse_template_docx(byte_content):
         if pending:
             if pending == 'answer' and re.match(r'^[A-D]$', ln, re.I):
                 cur['answer'] = ln.upper(); pending = None; continue
-            if pending == 'mark' and re.match(r'^[0-9]+(?:\.[0-9]+)?$', ln):
+            if pending == 'mark' and re.match(r'^[0-9]+(?:\.[0-9]+)?', ln):
                 cur['mark'] = float(ln); pending = None; continue
             if pending == 'unit':
                 cur['unit'] = ln; pending = None; continue
