@@ -34,6 +34,26 @@
                         </div>
                     </div>
 
+                    <!-- Thời gian làm bài -->
+                    <div class="mb-3">
+                        <label for="duration_minutes" class="form-label">
+                            <i class="fas fa-clock me-1"></i>
+                            Thời gian làm bài (phút)
+                        </label>
+                        <input type="number" 
+                               name="duration_minutes" 
+                               id="duration_minutes" 
+                               class="form-control" 
+                               min="1" 
+                               max="300" 
+                               value="60" 
+                               required>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Nhập số phút cho bài thi (từ 1 đến 300 phút)
+                        </div>
+                    </div>
+
                     <!-- File upload -->
                     <div class="mb-4">
                         <label for="file" class="form-label">

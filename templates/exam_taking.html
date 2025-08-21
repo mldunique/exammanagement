@@ -121,7 +121,7 @@
 <script>
 $(document).ready(function() {
     // Timer countdown
-    let timeLeft = parseInt('{{ remaining_time|default:0 }}');
+    let timeLeft = parseInt('{{ remaining_time|default:0 }}'); // Already in seconds
     const submitUrl = "{% url 'exam_submit' session.id %}";
     const saveAnswerUrl = "{% url 'save_answer' %}";
     

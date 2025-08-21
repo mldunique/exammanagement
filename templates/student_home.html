@@ -25,7 +25,7 @@
                     <h5 class="mb-1">{{ session.exam.code }} - {{ session.exam.subject.name }}</h5>
                     <small class="text-muted">
                         Bắt đầu: {{ session.start_time|date:"d/m/Y H:i" }} | 
-                        Thời gian còn lại: <span class="text-danger fw-bold">{{ session.get_remaining_time|floatformat:0 }} giây</span>
+                        Thời gian còn lại: <span class="text-danger fw-bold">{{ session.get_remaining_time_minutes|floatformat:0 }} phút</span>
                     </small>
                 </div>
                 <div class="col-md-4 text-end">
@@ -79,9 +79,7 @@
     
     <div class="col-md-4">
         <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-history"></i> Lịch sử thi gần đây</h5>
-            </div>
+
             <div class="card-body">
                 {% if my_attempts %}
                     {% for attempt in my_attempts %}
@@ -113,7 +111,7 @@
                         </a>
                     </div>
                 {% else %}
-                    <p class="text-muted">Chưa có lịch sử thi.</p>
+                    
                 {% endif %}
             </div>
         </div>

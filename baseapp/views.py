@@ -79,13 +79,23 @@ def import_docx(request):
             messages.error(request, "Hãy chọn file .docx (Template).")
             return redirect("import_docx")
 
+        # Lấy thời gian làm bài từ form
+        try:
+            duration_minutes = int(request.POST.get("duration_minutes", 60))
+            if duration_minutes < 1 or duration_minutes > 300:
+                messages.error(request, "Thời gian làm bài phải từ 1 đến 300 phút.")
+                return redirect("import_docx")
+        except (ValueError, TypeError):
+            messages.error(request, "Thời gian làm bài không hợp lệ.")
+            return redirect("import_docx")
+
         raw = file.read()
 
         # 1) Parse Template.docx (đọc text + image, xử lý nhãn/giá trị xuống dòng)
         try:
             meta, items = _parse_template_docx(raw)
         except Exception as e:
-            messages.error(request, f"Lỗi đọc Template.docx: {e}")
+            messages.error(request, "Chỉ chấp nhận file định dạng docx")
             return redirect("import_docx")
 
         # 2) Map Subject từ header
@@ -96,11 +106,14 @@ def import_docx(request):
             messages.error(request, f"Subject '{subj_raw}' không tồn tại. Tạo trước trong admin.")
             return redirect("import_docx")
 
-        # 3) Kiểm tra mã đề
-        exam_code = (meta['topic_code'] or '').strip()
-        if not exam_code:
+        # 3) Kiểm tra mã đề và thêm tiền tố subject
+        exam_code_raw = (meta['topic_code'] or '').strip()
+        if not exam_code_raw:
             messages.error(request, "Thiếu Topic code (Mã đề).")
             return redirect("import_docx")
+        
+        # Thêm tiền tố subject vào mã đề
+        exam_code = f"{subject.code}_{exam_code_raw}"
         if Exam.objects.filter(code=exam_code).exists():
             messages.error(request, f"Mã đề '{exam_code}' đã tồn tại.")
             return redirect("import_docx")
@@ -157,7 +170,7 @@ def import_docx(request):
             exam = Exam.objects.create(
                 code=exam_code,
                 subject=subject,
-                duration_minutes=60,
+                duration_minutes=duration_minutes,
                 question_count=len(created_qs),
             )
             for idx, (qobj, mix) in enumerate(created_qs, start=1):
@@ -174,12 +187,9 @@ def import_docx(request):
                     )
 
         msg = f"Đã import {len(created_qs)} câu hỏi cho {subject}. Tạo đề '{exam.code}'."
-        if '_num_quiz_mismatch' in meta:
-            exp, found = meta['_num_quiz_mismatch']
-            warns.append(f"Số câu trong header: {exp}; thực tế: {found}.")
         messages.success(request, msg)
-        if warns:
-            messages.warning(request, "Cảnh báo:\n" + "\n".join(warns))
+        if warns or '_num_quiz_mismatch' in meta:
+            messages.warning(request, "Lưu ý: File có thể không đúng định dạng chuẩn. Vui lòng kiểm tra lại template DOCX.")
         return redirect('exam_preview', exam_id=exam.id)
 
     return render(request, "import_docx.html", {"subjects": subjects})
@@ -202,8 +212,11 @@ def exam_create(request):
             return redirect('exam_create')
 
         subject = get_object_or_404(Subject, id=subject_id)
-        if Exam.objects.filter(code=code).exists():
-            messages.error(request, "Mã đề đã tồn tại.")
+        
+        # Thêm tiền tố subject vào mã đề
+        exam_code = f"{subject.code}_{code}"
+        if Exam.objects.filter(code=exam_code).exists():
+            messages.error(request, f"Mã đề '{exam_code}' đã tồn tại.")
             return redirect('exam_create')
 
         all_qs = list(Question.objects.filter(subject=subject).prefetch_related('choices'))
@@ -214,7 +227,7 @@ def exam_create(request):
         picked = sample(all_qs, n)   # chọn ngẫu nhiên n câu
         with transaction.atomic():
             exam = Exam.objects.create(
-                code=code, subject=subject,
+                code=exam_code, subject=subject,
                 duration_minutes=duration, question_count=n
             )
             for idx, q in enumerate(picked, start=1):

@@ -83,7 +83,7 @@ class Exam(models.Model):
     # NEW: Thời gian thi thực tế
     start_time = models.DateTimeField(null=True, blank=True)  # Thời điểm bắt đầu cho phép thi
     end_time = models.DateTimeField(null=True, blank=True)    # Thời điểm kết thúc thi
-    is_active = models.BooleanField(default=False)            # Kích hoạt đề thi
+    is_active = models.BooleanField(default=True)            # Kích hoạt đề thi
     
     def is_available_now(self):
         """Kiểm tra đề thi có thể làm bây giờ không"""
@@ -125,7 +125,7 @@ class StudentExamSession(models.Model):
         unique_together = [('student', 'exam')]  # Mỗi học sinh chỉ làm 1 lần/đề
     
     def get_remaining_time(self):
-        """Tính thời gian còn lại (phút)"""
+        """Tính thời gian còn lại (giây)"""
         if self.is_submitted:
             return 0
         
@@ -139,7 +139,11 @@ class StudentExamSession(models.Model):
         if now >= exam_deadline:
             return 0
             
-        return int((exam_deadline - now).total_seconds() / 60)
+        return int((exam_deadline - now).total_seconds())
+    
+    def get_remaining_time_minutes(self):
+        """Tính thời gian còn lại (phút) - để hiển thị"""
+        return int(self.get_remaining_time() / 60)
     
     def is_time_up(self):
         """Kiểm tra đã hết giờ chưa"""
